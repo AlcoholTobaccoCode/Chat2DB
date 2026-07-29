@@ -12,6 +12,7 @@ import org.cef.browser.CefBrowser;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.Locale;
 import java.util.Map;
 
 
@@ -26,7 +27,7 @@ public final class JcefContext {
     private Component browserUI_;
     private MainJFrame frame_;
     private JCefAppConfig jcefAppConfig_;
-    private OSTypeEnum osType;
+    private final OSTypeEnum osType = resolveOsType();
     private Integer screenWidth;
     private Integer screenHeight;
 
@@ -55,18 +56,6 @@ public final class JcefContext {
         this.browserUI_ = browserUI;
         this.jcefAppConfig_ = jCefAppConfig;
 
-        String os = System.getProperty("os.name").toLowerCase();
-        if (os.startsWith("windows")) {
-            osType = OSTypeEnum.Windows;
-
-        } else if (os.startsWith("linux")) {
-            osType = OSTypeEnum.Linux;
-        } else if (os.startsWith("mac")) {
-            osType = OSTypeEnum.Mac;
-        } else {
-            osType = OSTypeEnum.Other;
-        }
-
         Map<String, Integer> screenInfo = OSOperateUtil.getScreenInfo(frame_);
         screenWidth = screenInfo.get("width");
         screenHeight = screenInfo.get("height");
@@ -74,5 +63,19 @@ public final class JcefContext {
 
     public static JcefContext getInstance() {
         return JcefContextHolder.INSTANCE;
+    }
+
+    private static OSTypeEnum resolveOsType() {
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        if (os.startsWith("windows")) {
+            return OSTypeEnum.Windows;
+        }
+        if (os.startsWith("linux")) {
+            return OSTypeEnum.Linux;
+        }
+        if (os.startsWith("mac")) {
+            return OSTypeEnum.Mac;
+        }
+        return OSTypeEnum.Other;
     }
 }

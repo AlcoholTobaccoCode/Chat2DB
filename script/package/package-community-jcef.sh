@@ -17,6 +17,7 @@ Environment:
   SKIP_BACKEND=true             Skip Maven backend build.
   SKIP_FRONTEND=true            Skip frontend build.
   COMMUNITY_UPDATE_BASE_URL     Metadata base URL.
+  CHAT2DB_JBR_BASE_URL          HTTPS mirror for the pinned JBR archives.
   MAC_SIGNING_IDENTITY          macOS Developer ID Application identity.
 
 Examples:
@@ -35,6 +36,7 @@ TARGET="${2:-prepare}"
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT_DIR=$(cd "${SCRIPT_DIR}/../.." && pwd)
+JBR_RUNTIME_MANIFEST="${ROOT_DIR}/script/jbr-runtime-manifest.sh"
 SERVER_DIR="${ROOT_DIR}/chat2db-community-server"
 CLIENT_DIR="${ROOT_DIR}/chat2db-community-client"
 JPACKAGE_INPUT_DIR="${ROOT_DIR}/jpackage/input"
@@ -43,7 +45,6 @@ COMMUNITY_JAR="${SERVER_DIR}/chat2db-community-start/target/chat2db-community.ja
 COMMUNITY_LIB_DIR="${SERVER_DIR}/chat2db-community-start/target/lib"
 COMMUNITY_LIB_ZIP="${SERVER_DIR}/chat2db-community-start/target/lib.zip"
 UPDATE_BASE_URL="${COMMUNITY_UPDATE_BASE_URL:-https://cdn.chat2db-ai.com/community/updates}"
-JBR_BASE_URL="https://cache-redirector.jetbrains.com/intellij-jbr"
 JBR_WORK_DIR=""
 JBR_EXTRACT_DIR=""
 
@@ -55,6 +56,32 @@ case "${TARGET}" in
     exit 1
     ;;
 esac
+
+if [ "${TARGET}" != "prepare" ]; then
+  if [ ! -f "${JBR_RUNTIME_MANIFEST}" ]; then
+    echo "[error] JBR runtime manifest not found: ${JBR_RUNTIME_MANIFEST}" >&2
+    exit 1
+  fi
+  # shellcheck source=../jbr-runtime-manifest.sh
+  . "${JBR_RUNTIME_MANIFEST}"
+  JBR_BASE_URL="${CHAT2DB_JBR_BASE_URL:-${JBR_RUNTIME_DEFAULT_BASE_URL}}"
+  case "${JBR_BASE_URL}" in
+    https://*) ;;
+    *)
+      echo "[error] CHAT2DB_JBR_BASE_URL must use HTTPS" >&2
+      exit 1
+      ;;
+  esac
+  JBR_BASE_AUTHORITY=${JBR_BASE_URL#https://}
+  JBR_BASE_AUTHORITY=${JBR_BASE_AUTHORITY%%/*}
+  case "${JBR_BASE_AUTHORITY}" in
+    ""|*@*)
+      echo "[error] CHAT2DB_JBR_BASE_URL must not contain credentials" >&2
+      exit 1
+      ;;
+  esac
+  JBR_BASE_URL=${JBR_BASE_URL%/}
+fi
 
 cleanup() {
   if [ -n "${JBR_WORK_DIR}" ]; then
@@ -84,9 +111,28 @@ require_dir() {
   fi
 }
 
+calculate_sha512() {
+  local file="$1"
+  local checksum=""
+
+  if command -v sha512sum >/dev/null 2>&1; then
+    checksum=$(sha512sum "${file}" | awk '{print $1}')
+  elif command -v shasum >/dev/null 2>&1; then
+    checksum=$(shasum -a 512 "${file}" | awk '{print $1}')
+  elif command -v openssl >/dev/null 2>&1; then
+    checksum=$(openssl dgst -sha512 "${file}" | awk '{print $NF}')
+  else
+    echo "[error] SHA-512 verification requires sha512sum, shasum, or openssl" >&2
+    return 1
+  fi
+  printf '%s\n' "${checksum}" | tr 'A-F' 'a-f'
+}
+
 download_jbr() {
   local archive_name="$1"
+  local expected_checksum="$2"
   local archive_path
+  local actual_checksum
 
   require_command curl
   require_command tar
@@ -97,32 +143,35 @@ download_jbr() {
   mkdir -p "${JBR_EXTRACT_DIR}"
 
   echo "[run] download JBR runtime: ${archive_name}"
-  curl --fail --location --retry 3 \
+  curl --fail --location --proto '=https' --proto-redir '=https' \
+    --retry 3 --continue-at - \
     --output "${archive_path}" \
     "${JBR_BASE_URL}/${archive_name}"
+  actual_checksum=$(calculate_sha512 "${archive_path}")
+  expected_checksum=$(printf '%s' "${expected_checksum}" | tr 'A-F' 'a-f')
+  if [ "${actual_checksum}" != "${expected_checksum}" ]; then
+    echo "[error] JBR archive SHA-512 verification failed: ${archive_name}" >&2
+    exit 1
+  fi
+  echo "[run] verified JBR archive SHA-512"
   tar -xzf "${archive_path}" -C "${JBR_EXTRACT_DIR}" --strip-components=1
 }
 
 prepare_macos_runtime() {
   local machine_arch
   local archive_name
+  local archive_sha512
   local jbr_home
 
   machine_arch=$(uname -m)
-  case "${machine_arch}" in
-    arm64|aarch64)
-      archive_name="jbr_jcef-17.0.12-osx-aarch64-b1207.37.tar.gz"
-      ;;
-    x86_64|amd64)
-      archive_name="jbr_jcef-17.0.12-osx-x64-b1207.37.tar.gz"
-      ;;
-    *)
-      echo "[error] unsupported macOS architecture: ${machine_arch}" >&2
-      exit 1
-      ;;
-  esac
+  if ! resolve_jbr_runtime_artifact Darwin "${machine_arch}"; then
+    echo "[error] unsupported macOS architecture: ${machine_arch}" >&2
+    exit 1
+  fi
+  archive_name="${JBR_RUNTIME_ARCHIVE}"
+  archive_sha512="${JBR_RUNTIME_SHA512}"
 
-  download_jbr "${archive_name}"
+  download_jbr "${archive_name}" "${archive_sha512}"
   jbr_home="${JBR_EXTRACT_DIR}/Contents/Home"
   require_dir "${jbr_home}/lib"
   require_dir "${JBR_EXTRACT_DIR}/Contents/Frameworks"
@@ -147,22 +196,17 @@ prepare_macos_runtime() {
 prepare_linux_runtime() {
   local machine_arch
   local archive_name
+  local archive_sha512
 
   machine_arch=$(uname -m)
-  case "${machine_arch}" in
-    aarch64|arm64)
-      archive_name="jbr_jcef-17.0.12-linux-aarch64-b1207.37.tar.gz"
-      ;;
-    x86_64|amd64)
-      archive_name="jbr_jcef-17.0.12-linux-x64-b1207.37.tar.gz"
-      ;;
-    *)
-      echo "[error] unsupported Linux architecture: ${machine_arch}" >&2
-      exit 1
-      ;;
-  esac
+  if ! resolve_jbr_runtime_artifact Linux "${machine_arch}"; then
+    echo "[error] unsupported Linux architecture: ${machine_arch}" >&2
+    exit 1
+  fi
+  archive_name="${JBR_RUNTIME_ARCHIVE}"
+  archive_sha512="${JBR_RUNTIME_SHA512}"
 
-  download_jbr "${archive_name}"
+  download_jbr "${archive_name}" "${archive_sha512}"
   require_dir "${JBR_EXTRACT_DIR}/lib"
 
   rm -rf "${JPACKAGE_INPUT_DIR}/runtime/linux"
@@ -172,7 +216,14 @@ prepare_linux_runtime() {
 }
 
 prepare_windows_runtime() {
-  download_jbr "jbr_jcef-17.0.12-windows-x64-b1207.37.tar.gz"
+  local machine_arch
+
+  machine_arch=$(uname -m)
+  if ! resolve_jbr_runtime_artifact Windows "${machine_arch}"; then
+    echo "[error] unsupported Windows architecture: ${machine_arch}" >&2
+    exit 1
+  fi
+  download_jbr "${JBR_RUNTIME_ARCHIVE}" "${JBR_RUNTIME_SHA512}"
   require_file "${JBR_EXTRACT_DIR}/bin/java.exe"
 
   rm -rf "${JPACKAGE_INPUT_DIR}/runtime/win"

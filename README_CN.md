@@ -150,17 +150,96 @@ java -Dloader.path=chat2db-community-server/chat2db-community-start/target/lib \
 
 ### 环境要求
 
-- Java 运行环境:<a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">Eclipse Temurin 17</a>
-- Node.js 18.17.0 或更高版本
+- Java 17 JDK:<a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">Eclipse Temurin 17</a>
+- Node.js >=18.17 且 <19、20.x 或 22.x(推荐 22.22.2)
+- Yarn 1.22.22,并使用仓库中已有的 lockfile
 - Maven 3.8 或以上版本
+- Bash 3.2 或以上版本、`curl`、`tar`,以及 `sha512sum`、`shasum`、`openssl` 中至少一个 SHA-512 校验工具(Windows 请使用 Git Bash)
 
 ### 克隆仓库
 
 ```bash
 git clone https://github.com/OtterMind/Chat2DB.git
+cd Chat2DB
 ```
 
-### 前端
+### 一键启动开发环境
+
+在仓库根目录执行启动脚本:
+
+| 目标 | 命令 |
+| --- | --- |
+| 启动 Web 后端和前端开发服务器 | `./script/dev-community.sh` 或 `./script/dev-community.sh web` |
+| 启动 JCEF Desktop 和前端开发服务器 | `./script/dev-community.sh desktop` |
+| 启动前强制重建后端 | 追加 `--build` |
+| 只查看解析后的命令,不启动进程 | 追加 `--dry-run` |
+
+启动前必须确保 `127.0.0.1:8889` 和 `127.0.0.1:10825` 都未被占用。脚本不会停止
+或复用无关进程,`--build` 也不会重启现有实例。从另一个 checkout 启动前,请先在
+原启动终端按 `Ctrl+C` 停止脚本。
+
+首次运行时,脚本会按需安装前端依赖、构建缺失或已过期的后端产物并初始化
+Community 本地加密密钥。按 `Ctrl+C` 会同时停止本次启动的两个进程。需要强制
+重建后端时使用 `./script/dev-community.sh --build`。
+
+脚本会先检查显式 `JBR_HOME`、`JAVA_HOME`、当前 `PATH` 中 Java 报告的真实
+`java.home`(兼容 jenv、asdf、mise 和 SDKMAN)、macOS 已安装的 Chat2DB
+Community.app 以及仓库内已准备的运行时。如果都不包含 JCEF,脚本会按当前受支持
+平台下载仓库锁定的 JetBrains Runtime,使用 JetBrains 官方 SHA-512 校验后写入
+用户缓存。自动下载支持 macOS arm64/x64、Linux arm64/x64 和 Windows x64。首次
+下载约 180-205 MiB,后续启动直接复用已校验缓存。因此新电脑 clone 项目后不需要
+先安装 `/Applications/Chat2DB Community.app`,也不需要手工配置 `JBR_HOME`;jenv
+当前的普通 Temurin 17 仍可继续用于日常 Java 开发。
+
+`JBR_HOME` 仍可作为显式覆盖,但值无效时会立即失败。
+`CHAT2DB_JBR_DOWNLOAD=never` 只禁止自动下载 JBR;此时必须已有可解析的兼容 JBR,
+而 Maven 或 Yarn 仍可能联网。自定义绝对缓存路径可设置
+`CHAT2DB_JBR_CACHE_DIR`,使用镜像可设置 `CHAT2DB_JBR_BASE_URL`(必须为 HTTPS,
+且提供完全相同的锁定归档)。Windows Git Bash 可直接传入 `C:\...` 路径。
+脚本会校验 Java 17、JCEF 模块、项目要求的 JCEF 版本和原生资源。执行
+`./script/dev-community.sh desktop --dry-run` 只打印缓存、下载计划和进程命令,
+不会联网或写缓存。Desktop 进程自身包含后端,不会再启动一个独立 Web 后端。
+
+仓库用 `.node-version`、`.nvmrc`、`.tool-versions` 和 Volta 配置统一推荐的
+Node.js 22.22.2。已激活的 Node.js >=18.17 且 <19、20.x、22.x 均受支持;Node.js 24
+与当前 Umi 工具链不兼容。特殊安装布局可通过 `CHAT2DB_NODE_HOME` 显式指定。
+脚本可以从本机已安装版本中选择兼容的 Node.js,但不会安装 Node.js、Yarn、Maven
+或其他前置命令行工具。
+
+#### 热更新边界
+
+开发模式下,浏览器和 JCEF Desktop 都从 `http://127.0.0.1:8889/` 加载前端。
+启动脚本所在 checkout 中的 React、TypeScript 和样式文件会被自动监听。Webpack
+首次编译和较大的增量编译可能需要数秒;排查热更新前,先等待启动终端出现
+`[Webpack] Compiled`,并确认浏览器控制台出现 `[webpack] connected.`。
+
+编译成功不会绕过 React 路由、组件状态或条件渲染。如果临时添加的 UI 标记已经
+进入 bundle 却没有显示,应先确认当前页面和状态确实会进入该代码分支。使用第二个
+clone 模拟新电脑时,启动期间也必须编辑这个 clone;另一个主仓库不在它的监听范围内。
+
+Java 后端和 JCEF 代码不会热加载到正在运行的 JVM。修改后先按 `Ctrl+C` 停止脚本,
+再重新启动。脚本会自动重建比 JAR 更新的后端源码;需要确保完整重建时追加
+`--build`。
+
+#### 模拟全新电脑
+
+全新 clone 不要求预装 Chat2DB Community,也不要求开发者手工下载 JBR。若要在
+不删除 macOS 已安装 App、不动正常用户缓存的情况下验证自动下载路径,请使用独立
+clone、独立空缓存目录和一个明确不存在的 App 路径:
+
+```bash
+CHAT2DB_TEST_JBR_CACHE="$(mktemp -d)"
+CHAT2DB_COMMUNITY_APP="/nonexistent/Chat2DB Community.app" \
+CHAT2DB_JBR_CACHE_DIR="${CHAT2DB_TEST_JBR_CACHE}" \
+./script/dev-community.sh desktop
+```
+
+如果测试目标是验证自动下载,请不要设置 `JBR_HOME`,并让当前 Java 保持为普通
+Java 17 JDK。验证完成后只需处理这个独立缓存目录;无需删除已安装 App、正常 JBR
+缓存、主开发仓库或 Chat2DB 应用数据。该方法验证的是 clone 初始化、依赖准备、
+JBR 下载和进程启动链路,不会模拟一个空的 Chat2DB 用户数据目录。
+
+### 手工启动前端
 
 请使用仓库中的 Yarn lockfile。
 
@@ -170,7 +249,11 @@ yarn install --frozen-lockfile
 yarn run start:community:hot
 ```
 
-### 后端
+Community 开发服务器仅监听 `127.0.0.1:8889`。当前 Umi 横幅仍可能列出
+Network 地址,但启动保护会将真实 socket 限制在回环地址。如果 8889 已被占用,
+启动会直接失败,不会静默改用其他端口。
+
+### 手工启动后端
 
 ```bash
 cd Chat2DB
@@ -189,6 +272,28 @@ java -Dloader.path=chat2db-community-server/chat2db-community-start/target/lib \
     -Dspring.profiles.active=dev \
     -jar chat2db-community-server/chat2db-community-start/target/chat2db-community.jar
 ```
+
+浏览器开发需要让前端和后端命令作为两个独立进程同时运行,然后访问
+`http://127.0.0.1:8889/`。
+
+### 桌面端开发(JCEF)
+
+桌面端开发请使用一键启动脚本。它会启动前端开发服务器、检查 Desktop 所需的
+外置依赖,并同时兼容完整 JBR 解压目录和 macOS 已安装 App 的 JBR/JCEF 拆分
+布局。此时不要再启动 Web 后端,Desktop 进程自身会占用
+`127.0.0.1:10825`。
+
+```bash
+./script/dev-community.sh desktop
+```
+
+Desktop JVM 参数和 JCEF 布局会随平台变化,因此固定的手工 Java 命令不能等价替代
+启动脚本。执行 `./script/dev-community.sh desktop --dry-run` 可查看当前机器的准确
+命令。如果确实要手工执行该命令,请先运行 `yarn run start:community:hot`,并等待
+`127.0.0.1:8889` 就绪。
+
+在 `dev + DESKTOP` 模式下,JCEF 会自动加载 `http://127.0.0.1:8889/`。
+release 运行时会继续加载包内的 `dist/index.html`。
 
 ### 构建本地 Docker 镜像
 

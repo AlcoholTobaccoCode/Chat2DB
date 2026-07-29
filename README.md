@@ -153,17 +153,113 @@ Automatic key-file creation depends on `chat2db.mode`, not `chat2db.gui`. Commun
 
 ### Prerequisites
 
-- Java runtime: <a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">Eclipse Temurin 17</a>
-- Node.js 18.17.0 or later
+- Java 17 JDK: <a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">Eclipse Temurin 17</a>
+- Node.js >=18.17 and <19, 20.x, or 22.x (22.22.2 preferred)
+- Yarn 1.22.22 using the checked-in lockfile
 - Maven 3.8 or later
+- Bash 3.2 or later, `curl`, `tar`, and one SHA-512 tool: `sha512sum`, `shasum`, or `openssl` (use Git Bash on Windows)
 
 ### Clone the Repository
 
 ```bash
 git clone https://github.com/OtterMind/Chat2DB.git
+cd Chat2DB
 ```
 
-### Frontend
+### One-command Development
+
+Run the launcher from the repository root:
+
+| Goal | Command |
+| --- | --- |
+| Start the Web backend and frontend dev server | `./script/dev-community.sh` or `./script/dev-community.sh web` |
+| Start the JCEF Desktop app and frontend dev server | `./script/dev-community.sh desktop` |
+| Force a backend rebuild before startup | Add `--build` |
+| Inspect resolved commands without starting processes | Add `--dry-run` |
+
+Both `127.0.0.1:8889` and `127.0.0.1:10825` must be free before startup. The
+launcher never stops or reuses an unrelated process, and `--build` does not
+restart an existing instance. Stop the previous launcher with `Ctrl+C` before
+starting another checkout.
+
+On first use, the launcher installs missing frontend dependencies, builds a
+missing or stale backend artifact, and initializes the local Community
+encryption key. `Ctrl+C` stops both processes started by the launcher. Use
+`./script/dev-community.sh --build` to force a backend rebuild.
+
+The launcher first checks an explicit `JBR_HOME`, `JAVA_HOME`, the real
+`java.home` reported by the active PATH Java (covering jenv, asdf, mise, and
+SDKMAN), an installed Chat2DB Community.app on macOS, and a staged runtime. If
+none contains JCEF, it downloads the pinned JetBrains Runtime for the current
+supported platform, verifies JetBrains' official SHA-512 checksum, and keeps it
+in the user cache. Automatic downloads support macOS arm64/x64, Linux arm64/x64,
+and Windows x64. The first download is approximately 180-205 MiB; later starts
+reuse the verified cache. A fresh clone therefore does not require an installed
+Chat2DB Community.app or a manually configured `JBR_HOME`. A normal Temurin 17
+selected by jenv remains suitable for regular Java development.
+
+`JBR_HOME` remains an explicit override and an invalid value fails immediately.
+Set `CHAT2DB_JBR_DOWNLOAD=never` to disable only the automatic JBR download;
+a compatible JBR must already be discoverable, and Maven or Yarn may still use
+the network. Set
+`CHAT2DB_JBR_CACHE_DIR` to an absolute custom cache path, or
+`CHAT2DB_JBR_BASE_URL` to an HTTPS mirror serving the exact pinned archives.
+Windows Git Bash accepts normal `C:\...` paths. The launcher validates Java 17,
+the JCEF module, the project JCEF version, and native resources before startup.
+`./script/dev-community.sh desktop --dry-run` only prints the resolved cache,
+download, and process commands; it performs no network or cache writes. The
+Desktop process contains the backend, so the launcher does not start a second
+Web backend in this mode.
+
+The repository's `.node-version`, `.nvmrc`, `.tool-versions`, and Volta settings
+pin the preferred Node.js 22.22.2. Activated Node.js >=18.17 and <19, 20.x, and
+22.x are supported; Node.js 24 is incompatible with the current Umi toolchain.
+Set `CHAT2DB_NODE_HOME` only for a nonstandard installation layout.
+The launcher can select an already installed compatible Node.js version, but it
+does not install Node.js, Yarn, Maven, or the other prerequisite command-line
+tools.
+
+#### Reload behavior
+
+The browser and JCEF Desktop app both load the renderer from
+`http://127.0.0.1:8889/` during development. React, TypeScript, and style changes
+inside the checkout that started the launcher are watched automatically. The
+initial Webpack build and a large incremental rebuild can take several seconds;
+wait for `[Webpack] Compiled` in the launcher terminal and confirm the browser
+console reports `[webpack] connected.` before diagnosing a reload failure.
+
+A successful rebuild does not bypass React routing, component state, or
+conditional rendering. When a temporary UI marker is compiled but not visible,
+confirm that the current page and state render the branch that contains it. If
+using a second clone to simulate a fresh computer, edit that clone while its
+launcher is running; the primary checkout is not watched by the second clone.
+
+Java backend and JCEF changes are not reloaded into the running JVM. Stop the
+launcher with `Ctrl+C` and start it again. Newer backend sources are rebuilt
+automatically; add `--build` when a clean forced rebuild is required.
+
+#### Fresh-clone validation
+
+A fresh clone does not require an installed Chat2DB Community app or a manually
+downloaded JBR. To exercise the automatic JBR download without deleting an
+installed macOS app or the normal user cache, use a separate clone, a dedicated
+empty cache directory, and a deliberately missing app path:
+
+```bash
+CHAT2DB_TEST_JBR_CACHE="$(mktemp -d)"
+CHAT2DB_COMMUNITY_APP="/nonexistent/Chat2DB Community.app" \
+CHAT2DB_JBR_CACHE_DIR="${CHAT2DB_TEST_JBR_CACHE}" \
+./script/dev-community.sh desktop
+```
+
+Leave `JBR_HOME` unset and use a normal Java 17 JDK when the purpose of the test
+is to verify the download path. The dedicated cache can be removed after the
+test; the installed app, normal JBR cache, primary checkout, and application
+data do not need to be changed. This validates clone bootstrap, dependency
+preparation, JBR download, and process startup; it intentionally does not
+simulate an empty Chat2DB user-data directory.
+
+### Manual Frontend Startup
 
 Use Yarn with the checked-in lockfile.
 
@@ -173,7 +269,12 @@ yarn install --frozen-lockfile
 yarn run start:community:hot
 ```
 
-### Backend
+The Community development server listens on `127.0.0.1:8889`. The current Umi
+banner may still list a Network URL, but the startup guard keeps the actual
+socket loopback-only. If port 8889 is occupied, startup fails instead of
+silently selecting another port.
+
+### Manual Backend Startup
 
 ```bash
 cd Chat2DB
@@ -192,6 +293,31 @@ java -Dloader.path=chat2db-community-server/chat2db-community-start/target/lib \
     -Dspring.profiles.active=dev \
     -jar chat2db-community-server/chat2db-community-start/target/chat2db-community.jar
 ```
+
+For browser development, keep the frontend and backend commands running as two
+separate processes, then open `http://127.0.0.1:8889/`.
+
+### Desktop Development (JCEF)
+
+Use the launcher for Desktop development. It starts the frontend development
+server, verifies the required Desktop dependencies, and adapts both complete
+JBR archives and the split JBR/JCEF layout used by an installed macOS app. Do
+not also start the Web backend: the Desktop process owns `127.0.0.1:10825`
+itself.
+
+```bash
+./script/dev-community.sh desktop
+```
+
+Desktop JVM flags and JCEF layouts differ by platform, so a static manual Java
+command is not a launcher-equivalent fallback. Run
+`./script/dev-community.sh desktop --dry-run` to inspect the exact command for
+the current machine. If launching that command manually, start
+`yarn run start:community:hot` first and wait for `127.0.0.1:8889` to become
+ready.
+
+In `dev + DESKTOP`, JCEF automatically loads `http://127.0.0.1:8889/`.
+Release runtimes continue to load the packaged `dist/index.html`.
 
 ### Build a Local Docker Image
 
