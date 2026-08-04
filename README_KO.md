@@ -153,105 +153,17 @@ java -Dloader.path=chat2db-community-server/chat2db-community-start/target/lib \
 
 ### 사전 요구 사항
 
-- Java 17 JDK: <a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">Eclipse Temurin 17</a>
-- Node.js >=18.17 및 <19, 20.x 또는 22.x(22.22.2 권장)
-- 저장소의 lockfile을 사용하는 Yarn 1.22.22
+- Java 런타임: <a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">Eclipse Temurin 17</a>
+- Node.js 18.17.0 이상
 - Maven 3.8 이상
-- Bash 3.2 이상, `curl`, `tar`, 그리고 SHA-512 도구(`sha512sum`, `shasum`, `openssl` 중 하나. Windows에서는 Git Bash 사용)
 
 ### 저장소 복제
 
 ```bash
 git clone https://github.com/OtterMind/Chat2DB.git
-cd Chat2DB
 ```
 
-### 원클릭 개발 환경
-
-저장소 루트에서 실행 스크립트를 사용하세요.
-
-| 목적 | 명령 |
-| --- | --- |
-| 웹 백엔드와 프런트엔드 개발 서버 시작 | `./script/dev-community.sh` 또는 `./script/dev-community.sh web` |
-| JCEF Desktop 앱과 프런트엔드 개발 서버 시작 | `./script/dev-community.sh desktop` |
-| 시작 전에 백엔드 강제 재빌드 | `--build` 추가 |
-| 프로세스를 시작하지 않고 확인된 명령 출력 | `--dry-run` 추가 |
-
-시작하기 전에 `127.0.0.1:8889`와 `127.0.0.1:10825`가 모두 비어 있어야 합니다.
-실행 스크립트는 관련 없는 프로세스를 종료하거나 재사용하지 않으며, `--build`도 기존
-인스턴스를 재시작하지 않습니다. 다른 checkout을 시작하기 전에 이전 실행 터미널에서
-`Ctrl+C`로 종료하세요.
-
-처음 실행할 때 스크립트는 누락된 프런트엔드 의존성을 설치하고, 없거나 오래된 백엔드
-아티팩트를 빌드하며, 로컬 Community 암호화 키를 초기화합니다. `Ctrl+C`를 누르면
-스크립트가 시작한 두 프로세스가 모두 종료됩니다. 백엔드를 강제로 재빌드하려면
-`./script/dev-community.sh --build`를 사용하세요.
-
-스크립트는 명시적인 `JBR_HOME`, `JAVA_HOME`, 활성 PATH Java가 보고하는 실제
-`java.home`(jenv, asdf, mise, SDKMAN 포함), macOS에 설치된 Chat2DB Community.app,
-준비된 runtime 순으로 확인합니다. 어느 곳에도 JCEF가 없으면 지원 플랫폼에 고정된
-JetBrains Runtime을 다운로드하고 JetBrains 공식 SHA-512 체크섬을 검증한 뒤 사용자
-캐시에 저장합니다. 자동 다운로드는 macOS arm64/x64, Linux arm64/x64, Windows x64를
-지원합니다. 첫 다운로드는 약 180~205MiB이며 이후 시작 시 검증된 캐시를 재사용합니다.
-따라서 새 clone에는 Chat2DB Community.app을 미리 설치하거나 `JBR_HOME`을 수동으로
-설정할 필요가 없습니다. jenv로 선택한 일반 Temurin 17은 평소 Java 개발에 계속 사용할
-수 있습니다.
-
-`JBR_HOME`은 명시적 재정의이며 잘못된 값은 즉시 실패합니다.
-`CHAT2DB_JBR_DOWNLOAD=never`는 JBR 자동 다운로드만 비활성화합니다. 이 경우 확인
-가능한 호환 JBR이 이미 있어야 하며 Maven이나 Yarn은 여전히 네트워크를 사용할 수
-있습니다. 사용자 지정 절대 캐시 경로에는 `CHAT2DB_JBR_CACHE_DIR`, 고정된 아카이브와
-정확히 같은 파일을 제공하는 HTTPS 미러에는 `CHAT2DB_JBR_BASE_URL`을 사용하세요.
-Windows Git Bash에서는 일반적인 `C:\...` 경로를 사용할 수 있습니다. 스크립트는
-시작 전에 Java 17, JCEF 모듈, 프로젝트 JCEF 버전, 네이티브 리소스를 검증합니다.
-`./script/dev-community.sh desktop --dry-run`은 캐시, 다운로드 계획, 프로세스 명령만
-출력하며 네트워크나 캐시에 쓰지 않습니다. Desktop 프로세스에 백엔드가 포함되므로 이
-모드에서는 별도의 웹 백엔드를 시작하지 않습니다.
-
-저장소의 `.node-version`, `.nvmrc`, `.tool-versions`, Volta 설정은 권장 Node.js를
-22.22.2로 고정합니다. Node.js >=18.17 및 <19, 20.x, 22.x를 지원하며 Node.js 24는
-현재 Umi 도구 체인과 호환되지 않습니다. 비표준 설치 경로에서만
-`CHAT2DB_NODE_HOME`을 설정하세요. 스크립트는 이미 설치된 호환 Node.js를 선택할 수
-있지만 Node.js, Yarn, Maven 또는 기타 사전 요구 도구를 설치하지는 않습니다.
-
-#### 새로고침 동작
-
-개발 중에는 브라우저와 JCEF Desktop 앱이 모두 `http://127.0.0.1:8889/`에서
-renderer를 로드합니다. 실행 스크립트를 시작한 checkout 안의 React, TypeScript,
-스타일 변경 사항은 자동으로 감지됩니다. 첫 Webpack 빌드와 큰 증분 빌드에는 몇 초가
-걸릴 수 있습니다. 새로고침 문제를 진단하기 전에 실행 터미널의
-`[Webpack] Compiled`와 브라우저 콘솔의 `[webpack] connected.`를 확인하세요.
-
-빌드 성공은 React 라우팅, 컴포넌트 상태 또는 조건부 렌더링을 우회하지 않습니다.
-임시 UI 표시가 bundle에 포함됐지만 보이지 않는다면 현재 페이지와 상태가 해당 분기를
-렌더링하는지 확인하세요. 새 컴퓨터를 시뮬레이션하기 위해 두 번째 clone을 사용하는
-경우 해당 스크립트가 실행되는 동안 그 clone을 편집해야 합니다. 기본 checkout은 감시
-대상이 아닙니다.
-
-백엔드와 JCEF의 Java 변경 사항은 실행 중인 JVM에 다시 로드되지 않습니다. `Ctrl+C`로
-스크립트를 종료한 뒤 다시 시작하세요. JAR보다 최신인 백엔드 소스는 자동으로
-재빌드되며, 완전한 강제 재빌드가 필요하면 `--build`를 추가하세요.
-
-#### 새 clone 검증
-
-새 clone에는 Chat2DB Community를 설치하거나 JBR을 수동으로 다운로드할 필요가
-없습니다. 설치된 macOS 앱이나 일반 사용자 캐시를 삭제하지 않고 자동 다운로드를
-검증하려면 별도의 clone, 전용 빈 캐시 디렉터리, 존재하지 않는 앱 경로를 사용하세요.
-
-```bash
-CHAT2DB_TEST_JBR_CACHE="$(mktemp -d)"
-CHAT2DB_COMMUNITY_APP="/nonexistent/Chat2DB Community.app" \
-CHAT2DB_JBR_CACHE_DIR="${CHAT2DB_TEST_JBR_CACHE}" \
-./script/dev-community.sh desktop
-```
-
-다운로드 경로를 검증하려면 `JBR_HOME`을 설정하지 말고 일반 Java 17 JDK를 사용하세요.
-검증 후에는 전용 캐시만 처리하면 됩니다. 설치된 앱, 일반 JBR 캐시, 기본 checkout,
-Chat2DB 애플리케이션 데이터를 삭제할 필요가 없습니다. 이 절차는 clone 초기화, 의존성
-준비, JBR 다운로드, 프로세스 시작을 검증하며 빈 Chat2DB 사용자 데이터 디렉터리를
-시뮬레이션하지는 않습니다.
-
-### 프런트엔드 수동 시작
+### 프런트엔드
 
 저장소에 포함된 잠금 파일과 함께 Yarn을 사용하세요.
 
@@ -261,11 +173,7 @@ yarn install --frozen-lockfile
 yarn run start:community:hot
 ```
 
-Community 개발 서버는 `127.0.0.1:8889`에서만 수신합니다. 현재 Umi 배너에 Network
-URL이 표시될 수 있지만 시작 보호 로직은 실제 socket을 loopback으로 제한합니다.
-8889 포트가 사용 중이면 다른 포트를 자동 선택하지 않고 시작에 실패합니다.
-
-### 백엔드 수동 시작
+### 백엔드
 
 ```bash
 cd Chat2DB
@@ -284,28 +192,6 @@ java -Dloader.path=chat2db-community-server/chat2db-community-start/target/lib \
     -Dspring.profiles.active=dev \
     -jar chat2db-community-server/chat2db-community-start/target/chat2db-community.jar
 ```
-
-브라우저 개발에서는 프런트엔드와 백엔드 명령을 별도의 프로세스로 계속 실행하고
-`http://127.0.0.1:8889/`를 여세요.
-
-### Desktop 개발(JCEF)
-
-Desktop 개발에는 실행 스크립트를 사용하세요. 프런트엔드 개발 서버를 시작하고 필요한
-Desktop 의존성을 검증하며, 전체 JBR 아카이브와 설치된 macOS 앱의 분리된 JBR/JCEF
-레이아웃을 모두 처리합니다. 웹 백엔드를 따로 시작하지 마세요. Desktop 프로세스가
-`127.0.0.1:10825`를 직접 사용합니다.
-
-```bash
-./script/dev-community.sh desktop
-```
-
-Desktop JVM 인수와 JCEF 레이아웃은 플랫폼마다 다르므로 고정된 수동 Java 명령은 실행
-스크립트와 동등하지 않습니다. `./script/dev-community.sh desktop --dry-run`으로 현재
-컴퓨터의 정확한 명령을 확인하세요. 해당 명령을 수동으로 실행한다면 먼저
-`yarn run start:community:hot`을 시작하고 `127.0.0.1:8889`가 준비될 때까지 기다리세요.
-
-`dev + DESKTOP` 모드에서 JCEF는 `http://127.0.0.1:8889/`를 자동으로 로드합니다.
-release runtime은 패키지의 `dist/index.html`을 계속 로드합니다.
 
 ### 로컬 Docker 이미지 빌드
 

@@ -5,12 +5,9 @@ and Zustand. Community behavior is selected with `UMI_ENV=community`.
 
 ## Requirements
 
-- Node.js >=18.17 and <19, 20.x, or 22.x (22.22.2 preferred)
-- Yarn 1.22.22 using the repository's `yarn.lock`
+- Node.js 18.17.0 or newer
+- Yarn using the repository's `yarn.lock`
 - The Community backend when running the development server
-
-See the repository [prerequisites](../README.md#prerequisites) for the JDK,
-Maven, shell, and Desktop download tools required by the root launcher.
 
 Install dependencies from this directory:
 
@@ -23,51 +20,13 @@ lockfile.
 
 ## Development
 
-The preferred entry point is the repository launcher. From the repository root,
-run one of these commands:
-
-```bash
-./script/dev-community.sh web
-./script/dev-community.sh desktop
-```
-
-Web mode starts this frontend and the Community Web backend. Desktop mode
-starts this frontend and the Community JCEF JVM, which contains its own backend.
-Do not start a second backend on port `10825` in Desktop mode.
-
-For manual browser development, start the Community Web backend on
-`127.0.0.1:10825`, then run from this directory:
+Start the Community backend on `127.0.0.1:10825`, then run:
 
 ```bash
 yarn run start:community:hot
 ```
 
-The Community development server listens only on `127.0.0.1:8889`. The current
-Umi banner may still list a Network URL, but the startup guard keeps the actual
-socket loopback-only. If port 8889 is occupied, startup fails instead of
-silently selecting another port. Keep the backend and frontend running as
-separate processes and open `http://127.0.0.1:8889/`.
-
-React, TypeScript, and style changes in the checkout that started the dev server
-are watched automatically. The initial build and large incremental builds can
-take several seconds; wait for `[Webpack] Compiled` and confirm the browser
-console reports `[webpack] connected.`. A compiled change is still subject to
-the current route, component state, and conditional rendering. A dev server
-started from another clone does not watch this checkout.
-
-Backend and JCEF Java changes require stopping and restarting the repository
-launcher. Use `--build` to force the backend rebuild when needed.
-
-For Desktop development, the launcher starts this frontend and a Community JVM
-with `chat2db.mode=DESKTOP` and `spring.profiles.active=dev`. It reuses a
-compatible local JBR when available; otherwise it downloads the
-repository-pinned JBR 17 with JCEF on macOS arm64/x64, Linux arm64/x64, or
-Windows x64, verifies the official SHA-512 checksum, and caches it for later
-starts. JCEF then loads the development renderer automatically; do not start a
-second Web backend on port `10825`. `CHAT2DB_JBR_DOWNLOAD=never` disables only
-the automatic JBR download; Maven or Yarn may still use the network.
-
-Packaged release runtimes keep loading their staged `dist/index.html`.
+The Community development server listens on port `8889`.
 
 ## Production Build
 

@@ -154,116 +154,17 @@ La creación automática del archivo de clave depende de `chat2db.mode`, no de `
 
 ### Requisitos previos
 
-- JDK de Java 17: <a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">Eclipse Temurin 17</a>
-- Node.js >=18.17 y <19, 20.x o 22.x (se recomienda 22.22.2)
-- Yarn 1.22.22 con el archivo de bloqueo incluido en el repositorio
+- Entorno de ejecución de Java: <a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">Eclipse Temurin 17</a>
+- Node.js 18.17.0 o posterior
 - Maven 3.8 o posterior
-- Bash 3.2 o posterior, `curl`, `tar` y una herramienta SHA-512: `sha512sum`, `shasum` u `openssl` (use Git Bash en Windows)
 
 ### Clonar el repositorio
 
 ```bash
 git clone https://github.com/OtterMind/Chat2DB.git
-cd Chat2DB
 ```
 
-### Desarrollo con un solo comando
-
-Ejecute el lanzador desde la raíz del repositorio:
-
-| Objetivo | Comando |
-| --- | --- |
-| Iniciar el backend web y el servidor de desarrollo frontend | `./script/dev-community.sh` o `./script/dev-community.sh web` |
-| Iniciar la aplicación JCEF Desktop y el servidor de desarrollo frontend | `./script/dev-community.sh desktop` |
-| Forzar una reconstrucción del backend antes de iniciar | Añada `--build` |
-| Ver los comandos resueltos sin iniciar procesos | Añada `--dry-run` |
-
-Los puertos `127.0.0.1:8889` y `127.0.0.1:10825` deben estar libres antes del
-inicio. El lanzador nunca detiene ni reutiliza procesos ajenos, y `--build` no
-reinicia una instancia existente. Detenga el lanzador anterior con `Ctrl+C`
-antes de iniciar otro checkout.
-
-En el primer uso, el lanzador instala las dependencias frontend que falten,
-compila un artefacto de backend ausente u obsoleto e inicializa la clave local
-de cifrado de Community. `Ctrl+C` detiene los dos procesos iniciados por el
-lanzador. Use `./script/dev-community.sh --build` para forzar la reconstrucción
-del backend.
-
-El lanzador comprueba primero un `JBR_HOME` explícito, `JAVA_HOME`, el
-`java.home` real informado por el Java activo en `PATH` (incluidos jenv, asdf,
-mise y SDKMAN), una aplicación Chat2DB Community instalada en macOS y un runtime
-preparado. Si ninguno contiene JCEF, descarga el JetBrains Runtime fijado para
-una plataforma compatible, verifica la suma SHA-512 oficial de JetBrains y lo
-guarda en la caché del usuario. La descarga automática admite macOS arm64/x64,
-Linux arm64/x64 y Windows x64. La primera descarga ocupa aproximadamente
-180-205 MiB; los siguientes inicios reutilizan la caché verificada. Por tanto,
-un clon nuevo no requiere una aplicación Chat2DB Community instalada ni un
-`JBR_HOME` configurado manualmente. Un Temurin 17 normal seleccionado mediante
-jenv sigue siendo válido para el desarrollo habitual en Java.
-
-`JBR_HOME` sigue siendo una sobrescritura explícita y un valor no válido provoca
-un fallo inmediato. `CHAT2DB_JBR_DOWNLOAD=never` solo desactiva la descarga
-automática de JBR; debe existir un JBR compatible que pueda resolverse, y Maven
-o Yarn aún pueden usar la red. Use `CHAT2DB_JBR_CACHE_DIR` para una ruta de caché
-absoluta personalizada o `CHAT2DB_JBR_BASE_URL` para un espejo HTTPS que sirva
-exactamente los archivos fijados. Git Bash para Windows acepta rutas normales
-como `C:\...`. El lanzador valida Java 17, el módulo JCEF, la versión JCEF del
-proyecto y los recursos nativos antes de iniciar.
-`./script/dev-community.sh desktop --dry-run` solo muestra la caché, el plan de
-descarga y los comandos de los procesos; no accede a la red ni escribe en la
-caché. El proceso Desktop contiene el backend, por lo que en este modo el
-lanzador no inicia un segundo backend web.
-
-Los archivos `.node-version`, `.nvmrc`, `.tool-versions` y la configuración de
-Volta fijan Node.js 22.22.2 como versión recomendada. Se admiten Node.js >=18.17
-y <19, 20.x y 22.x; Node.js 24 es incompatible con la cadena de herramientas
-Umi actual. Use `CHAT2DB_NODE_HOME` solo para una instalación no estándar. El
-lanzador puede seleccionar una versión compatible ya instalada, pero no instala
-Node.js, Yarn, Maven ni las demás herramientas requeridas.
-
-#### Comportamiento de recarga
-
-Durante el desarrollo, tanto el navegador como la aplicación JCEF Desktop
-cargan el renderer desde `http://127.0.0.1:8889/`. Los cambios de React,
-TypeScript y estilos dentro del checkout que inició el lanzador se observan
-automáticamente. La compilación inicial de Webpack y una recompilación
-incremental grande pueden tardar varios segundos; espere a `[Webpack] Compiled`
-en el terminal y confirme `[webpack] connected.` en la consola del navegador
-antes de diagnosticar un fallo de recarga.
-
-Una compilación correcta no omite las rutas, el estado de los componentes ni el
-renderizado condicional de React. Si un marcador temporal está compilado pero no
-aparece, confirme que la página y el estado actuales renderizan esa rama. Si usa
-un segundo clon para simular otro equipo, edite ese clon mientras su lanzador
-esté activo; el checkout principal no está dentro de su vigilancia.
-
-Los cambios de Java en el backend y JCEF no se recargan en la JVM en ejecución.
-Detenga el lanzador con `Ctrl+C` y vuelva a iniciarlo. Las fuentes de backend más
-nuevas que el JAR se reconstruyen automáticamente; añada `--build` para forzar
-una reconstrucción limpia.
-
-#### Validación de un clon nuevo
-
-Un clon nuevo no requiere Chat2DB Community instalado ni un JBR descargado
-manualmente. Para comprobar la descarga automática sin borrar una aplicación
-instalada en macOS ni la caché habitual, use otro clon, una caché vacía dedicada
-y una ruta de aplicación que no exista:
-
-```bash
-CHAT2DB_TEST_JBR_CACHE="$(mktemp -d)"
-CHAT2DB_COMMUNITY_APP="/nonexistent/Chat2DB Community.app" \
-CHAT2DB_JBR_CACHE_DIR="${CHAT2DB_TEST_JBR_CACHE}" \
-./script/dev-community.sh desktop
-```
-
-Deje `JBR_HOME` sin definir y use un JDK de Java 17 normal si desea verificar la
-ruta de descarga. Después puede eliminar únicamente la caché dedicada; no hace
-falta modificar la aplicación instalada, la caché JBR habitual, el checkout
-principal ni los datos de Chat2DB. Este procedimiento valida la preparación del
-clon y las dependencias, la descarga del JBR y el inicio de procesos; no simula
-un directorio vacío de datos de usuario de Chat2DB.
-
-### Inicio manual del frontend
+### Frontend
 
 Use Yarn con el archivo de bloqueo incluido en el repositorio.
 
@@ -273,12 +174,7 @@ yarn install --frozen-lockfile
 yarn run start:community:hot
 ```
 
-El servidor de desarrollo Community solo escucha en `127.0.0.1:8889`. El banner
-actual de Umi puede mostrar una dirección de red, pero la protección de inicio
-mantiene el socket real limitado a loopback. Si el puerto 8889 está ocupado, el
-inicio falla en vez de elegir otro puerto silenciosamente.
-
-### Inicio manual del backend
+### Backend
 
 ```bash
 cd Chat2DB
@@ -297,31 +193,6 @@ java -Dloader.path=chat2db-community-server/chat2db-community-start/target/lib \
     -Dspring.profiles.active=dev \
     -jar chat2db-community-server/chat2db-community-start/target/chat2db-community.jar
 ```
-
-Para el desarrollo en navegador, mantenga los comandos frontend y backend como
-dos procesos separados y abra `http://127.0.0.1:8889/`.
-
-### Desarrollo de Desktop (JCEF)
-
-Use el lanzador para desarrollar Desktop. Inicia el servidor de desarrollo
-frontend, verifica las dependencias necesarias y adapta tanto archivos JBR
-completos como el diseño JBR/JCEF dividido de una aplicación macOS instalada.
-No inicie además el backend web: el proceso Desktop ocupa por sí mismo
-`127.0.0.1:10825`.
-
-```bash
-./script/dev-community.sh desktop
-```
-
-Los argumentos de la JVM y los diseños de JCEF varían según la plataforma, por
-lo que un comando Java manual estático no equivale al lanzador. Ejecute
-`./script/dev-community.sh desktop --dry-run` para ver el comando exacto del
-equipo actual. Si lo ejecuta manualmente, inicie primero
-`yarn run start:community:hot` y espere a que `127.0.0.1:8889` esté disponible.
-
-En modo `dev + DESKTOP`, JCEF carga automáticamente
-`http://127.0.0.1:8889/`. Los runtimes de release siguen cargando el
-`dist/index.html` empaquetado.
 
 ### Compilar una imagen de Docker local
 
