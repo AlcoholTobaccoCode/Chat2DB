@@ -172,6 +172,14 @@ EOF
 
 cat >"${FAKE_BIN}/yarn" <<'EOF'
 #!/usr/bin/env bash
+if [ "${1:-}" = "check" ] && [ "${2:-}" = "--integrity" ]; then
+    [ "${FAKE_YARN_INTEGRITY:-valid}" = "valid" ]
+    exit $?
+fi
+if [ "${1:-}" = "install" ] && [ "${2:-}" = "--frozen-lockfile" ]; then
+    printf '%s\n' install >>"${FAKE_STATE_DIR}/yarn.calls"
+    exit 0
+fi
 echo "$$" >"${FAKE_STATE_DIR}/client.pid"
 (
     trap 'touch "${FAKE_STATE_DIR}/client-child.stopped"; exit 0' TERM INT
@@ -486,6 +494,11 @@ assert_contains "${OUTPUT}" "-Dchat2db.mode=WEB"
 assert_contains "${OUTPUT}" "yarn run start:community:hot"
 assert_not_contains "${OUTPUT}" "-Dchat2db.mode=DESKTOP"
 
+FAKE_YARN_INTEGRITY=invalid run_launcher web --dry-run
+[ "${STATUS}" -eq 0 ] || fail "web dry-run failed with stale frontend dependencies: ${OUTPUT}"
+assert_contains "${OUTPUT}" "frontend dependencies are missing"
+assert_contains "${OUTPUT}" "yarn install --frozen-lockfile"
+
 FAKE_NODE_VERSION=$'v22.22.2\r' run_launcher web --dry-run
 [ "${STATUS}" -eq 0 ] || fail "web dry-run rejected a CRLF Node.js version: ${OUTPUT}"
 
@@ -712,6 +725,21 @@ set -e
 [ "${STATUS}" -eq 0 ] || fail "desktop did not discover the installed Community app runtime: ${OUTPUT}"
 assert_contains "${OUTPUT}" "desktop runtime: ${PACKAGED_JBR_HOME_EXPECTED} (installed Community app)"
 assert_contains "${OUTPUT}" "desktop JCEF Frameworks: ${PACKAGED_FRAMEWORKS_EXPECTED}"
+
+STAGED_JBR_HOME="${FIXTURE_ROOT}/jpackage/input/runtime/mac/Home"
+STAGED_FRAMEWORKS="${FIXTURE_ROOT}/jpackage/input/mac/Frameworks"
+create_jcef_runtime "${STAGED_JBR_HOME}"
+mkdir -p "$(dirname "${STAGED_FRAMEWORKS}")"
+mv "${STAGED_JBR_HOME}/../Frameworks" "${STAGED_FRAMEWORKS}"
+STAGED_JBR_HOME_EXPECTED=$(cd "${STAGED_JBR_HOME}" && pwd -P)
+STAGED_FRAMEWORKS_EXPECTED=$(cd "${STAGED_FRAMEWORKS}" && pwd -P)
+CHAT2DB_JBR_DOWNLOAD=never \
+FAKE_UNAME=Darwin \
+run_launcher desktop --dry-run
+[ "${STATUS}" -eq 0 ] || fail "desktop did not discover the staged macOS runtime: ${OUTPUT}"
+assert_contains "${OUTPUT}" "desktop runtime: ${STAGED_JBR_HOME_EXPECTED} (staged runtime)"
+assert_contains "${OUTPUT}" "desktop JCEF Frameworks: ${STAGED_FRAMEWORKS_EXPECTED}"
+rm -rf "${FIXTURE_ROOT}/jpackage"
 
 rm -f "${FIXTURE_ROOT}/chat2db-community-server/chat2db-community-start/target/lib/flatlaf-3.6.jar"
 set +e

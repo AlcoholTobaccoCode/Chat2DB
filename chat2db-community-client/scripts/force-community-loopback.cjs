@@ -63,7 +63,38 @@ function requireConfiguredPort(selectedPort, port) {
   return selectedPort;
 }
 
-function guardConfiguredPortSelection(portfinder, port, onSelected) {
+// portfinder checks every local interface, even when a host is supplied.
+function selectConfiguredLoopbackPort(port, netModule = net) {
+  return new Promise((resolve, reject) => {
+    const server = netModule.createServer();
+    let settled = false;
+
+    function finish(error) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      server.removeListener('error', finish);
+      if (error) {
+        reject(error);
+      } else {
+        resolve(port);
+      }
+    }
+
+    server.once('error', finish);
+    server.listen({ host: loopbackHost, port, exclusive: true }, () => {
+      server.close(finish);
+    });
+  });
+}
+
+function guardConfiguredPortSelection(
+  portfinder,
+  port,
+  onSelected,
+  selectPort = selectConfiguredLoopbackPort,
+) {
   const originalGetPortPromise = portfinder.getPortPromise;
   let selectionPending = true;
 
@@ -72,13 +103,13 @@ function guardConfiguredPortSelection(portfinder, port, onSelected) {
       selectionPending && isConfiguredPortSelection(options, port);
     if (guardSelection) {
       selectionPending = false;
+      const selectedPort = await selectPort(port);
+      requireConfiguredPort(selectedPort, port);
+      onSelected();
+      return selectedPort;
     }
 
     const selectedPort = await originalGetPortPromise.call(this, options);
-    if (guardSelection) {
-      requireConfiguredPort(selectedPort, port);
-      onSelected();
-    }
     return selectedPort;
   };
 }
@@ -121,6 +152,7 @@ module.exports = {
   isConfiguredPortSelection,
   isUmiDevWorker,
   requireConfiguredPort,
+  selectConfiguredLoopbackPort,
   trackChildExitCode,
   withCommunityLoopbackHost,
 };

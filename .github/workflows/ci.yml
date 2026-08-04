@@ -36,6 +36,9 @@ jobs:
       - name: Validate localization catalogs
         run: yarn test:i18n
 
+      - name: Run Community development loopback contract
+        run: yarn test:community-dev-loopback
+
       - name: Run ESLint
         run: yarn lint:eslint
 
@@ -164,6 +167,9 @@ jobs:
 
       - name: Validate Community operations contracts
         run: ruby script/github/validate-community-operations.rb
+
+      - name: Test Community development launcher
+        run: bash script/dev-community.test.sh
 
       - name: Test Community workflow automation
         run: node --test script/github/issue-claim.test.js script/github/sync-community-project.test.js

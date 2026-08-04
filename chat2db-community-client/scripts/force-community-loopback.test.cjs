@@ -16,6 +16,7 @@ const {
   isConfiguredPortSelection,
   isUmiDevWorker,
   requireConfiguredPort,
+  selectConfiguredLoopbackPort,
   trackChildExitCode,
   withCommunityLoopbackHost,
 } = require(preloadPath);
@@ -177,25 +178,39 @@ assert.throws(() => requireConfiguredPort(8890, 8889), /fallback port 8890/);
 assert.equal(isUmiDevWorker('/project/node_modules/umi/bin/forkedDev.js'), true);
 assert.equal(isUmiDevWorker('/project/node_modules/umi/bin/umi.js'), false);
 
+let fallbackPortfinderCalls = 0;
 const fallbackPortfinder = {
   async getPortPromise() {
+    fallbackPortfinderCalls += 1;
     return 8890;
   },
 };
 let fallbackActivated = false;
-guardConfiguredPortSelection(fallbackPortfinder, 8889, () => {
-  fallbackActivated = true;
-});
+guardConfiguredPortSelection(
+  fallbackPortfinder,
+  8889,
+  () => {
+    fallbackActivated = true;
+  },
+  async () => 8890,
+);
 
+let selectedPortfinderCalls = 0;
 const selectedPortfinder = {
   async getPortPromise() {
+    selectedPortfinderCalls += 1;
     return 8889;
   },
 };
 let loopbackActivated = false;
-guardConfiguredPortSelection(selectedPortfinder, 8889, () => {
-  loopbackActivated = true;
-});
+guardConfiguredPortSelection(
+  selectedPortfinder,
+  8889,
+  () => {
+    loopbackActivated = true;
+  },
+  async (port) => port,
+);
 
 let hotRestartProbeCalls = 0;
 function hotRestartGetPort(options, callback) {
@@ -238,11 +253,15 @@ Promise.all([
     /fallback port 8890/,
   ),
   selectedPortfinder.getPortPromise({ port: 8889 }),
+  selectConfiguredLoopbackPort(availableLoopbackPort()),
 ])
-  .then(([, selectedPort]) => {
+  .then(([, selectedPort, probedPort]) => {
     assert.equal(fallbackActivated, false);
+    assert.equal(fallbackPortfinderCalls, 0);
     assert.equal(selectedPort, 8889);
+    assert.equal(selectedPortfinderCalls, 0);
     assert.equal(loopbackActivated, true);
+    assert.ok(Number.isInteger(probedPort) && probedPort > 0);
     console.log('Community dev loopback tests passed');
   })
   .catch((error) => {

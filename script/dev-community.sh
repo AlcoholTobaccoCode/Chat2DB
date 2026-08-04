@@ -336,6 +336,7 @@ validate_desktop_runtime() {
     local missing_path=""
     local mac_frameworks=""
     local packaged_mac_frameworks=""
+    local staged_mac_frameworks=""
 
     DESKTOP_VALIDATION_ERROR=""
     DESKTOP_JCEF_FRAMEWORKS=""
@@ -395,8 +396,11 @@ validate_desktop_runtime() {
         Darwin)
             mac_frameworks="${normalized_home}/../Frameworks"
             packaged_mac_frameworks="${normalized_home}/../../../app/Frameworks"
+            staged_mac_frameworks="${normalized_home}/../../../mac/Frameworks"
             if [ ! -d "${mac_frameworks}" ] && [ -d "${packaged_mac_frameworks}" ]; then
                 mac_frameworks="${packaged_mac_frameworks}"
+            elif [ ! -d "${mac_frameworks}" ] && [ -d "${staged_mac_frameworks}" ]; then
+                mac_frameworks="${staged_mac_frameworks}"
             fi
             if [ ! -f "${normalized_home}/lib/libjcef.dylib" ]; then
                 missing_path="${normalized_home}/lib/libjcef.dylib"
@@ -914,6 +918,7 @@ resolve_desktop_java() {
             else
                 case "${platform}" in
                     Darwin)
+                        staged_home="${ROOT_DIR}/jpackage/input/runtime/mac/Home"
                         if [ -n "${CHAT2DB_COMMUNITY_APP:-}" ]; then
                             community_app="${CHAT2DB_COMMUNITY_APP}"
                             if try_desktop_runtime \
@@ -1104,7 +1109,8 @@ build_backend() {
 }
 
 prepare_frontend() {
-    if [ -e "${CLIENT_DIR}/node_modules/.bin/umi" ]; then
+    if [ -e "${CLIENT_DIR}/node_modules/.bin/umi" ] \
+        && (cd "${CLIENT_DIR}" && yarn check --integrity >/dev/null 2>&1); then
         return
     fi
 
