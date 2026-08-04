@@ -808,6 +808,7 @@ set +e
 OUTPUT=$(PATH="${FAKE_BIN}:${PATH}" \
     HOME="${TEST_ROOT}/home" \
     JBR_HOME="${INCOMPLETE_JBR}" \
+    FAKE_UNAME="Darwin" \
     FAKE_STATE_DIR="${STATE_DIR}" \
     bash "${FIXTURE_ROOT}/script/dev-community.sh" desktop --dry-run 2>&1)
 STATUS=$?
