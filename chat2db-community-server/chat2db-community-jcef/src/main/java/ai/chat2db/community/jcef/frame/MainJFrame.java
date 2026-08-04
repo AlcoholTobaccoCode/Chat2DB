@@ -8,9 +8,11 @@ import ai.chat2db.community.jcef.enums.AppThemeEnum;
 import ai.chat2db.community.jcef.enums.ThemeEnum;
 import ai.chat2db.community.jcef.event.manager.FileOpenEventManager;
 import ai.chat2db.community.jcef.handler.biz.IJcefActionHandler;
+import ai.chat2db.community.jcef.handler.biz.PreviewResourceScheme;
 import ai.chat2db.community.jcef.handler.keyboard.KeyboardHandler;
 import ai.chat2db.community.jcef.handler.mouse.CursorHandler;
 import ai.chat2db.community.jcef.listener.FileManagerService;
+import ai.chat2db.community.jcef.terminal.TerminalSessionManager;
 import ai.chat2db.community.jcef.menus.Chat2DBMenuBar;
 import ai.chat2db.community.jcef.renderer.RendererSource;
 import ai.chat2db.community.jcef.renderer.RendererSourceResolver;
@@ -517,16 +519,26 @@ public class MainJFrame extends JFrame {
                 }
             }
             @Override
+            public boolean onBeforeTerminate() {
+                TerminalSessionManager.shutdown();
+                return false;
+            }
+            @Override
             public void onContextInitialized() {
                 super.onContextInitialized();
                 SwingUtilities.invokeLater(()-> {
                     log.info("CEF App ContextInitialized");
+                    PreviewResourceScheme.registerFactory(cefApp_);
                     initializeActionHandlers();
                     initializeClientAndRouter();
                     initializeBrowserAndUI();
                     initializeFrame();
                     initPostProcessor();
                 });
+            }
+            @Override
+            public void onRegisterCustomSchemes(org.cef.callback.CefSchemeRegistrar registrar) {
+                PreviewResourceScheme.registerScheme(registrar);
             }
             @Override
             public void onBeforeCommandLineProcessing(String processType, CefCommandLine commandLine) {
