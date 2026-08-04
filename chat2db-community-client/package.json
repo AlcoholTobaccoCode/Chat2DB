@@ -35,7 +35,6 @@
     "test:bi-chart-sorting": "tsx src/blocks/BI/Chart/charts/BarChart/dataTreating.test.ts",
     "test:bi-sql-result": "tsx src/blocks/BI/ChartCardBox/EditorChartSql/executionResult.test.ts",
     "test:chat-answer-update": "tsx src/store/chat/slices/chatDetails/answerUpdates.test.ts",
-    "test:community-dev-loopback": "node scripts/force-community-loopback.test.cjs",
     "test:combo-axis-actions": "tsx src/blocks/BI/Chart/form/components/ComboAxisSelect/comboAxisSelect.test.ts",
     "test:database-object-sorting": "tsx src/blocks/NewTree/utils/sortTreeNodes.test.ts",
     "test:execution-console": "tsx src/blocks/SearchResult/components/ExecutionConsole/executionConsolePreferences.test.ts",
@@ -73,7 +72,7 @@
     "start": "APP_VERSION=${npm_config_app_version} UMI_DEV_SERVER_COMPRESS=none umi dev",
     "start:desktop:hot": "cross-env UMI_ENV=desktop cross-env APP_VERSION=${npm_config_app_version} PORT=8888 umi dev",
     "start:desktop:hot:p": "yarn run start:desktop:hot --proxy_target=http://192.168.0.222:11921 --gateway_url=http://192.168.0.222:1921",
-    "start:community:hot": "cross-env UMI_ENV=community cross-env APP_NAME=chat2db-community cross-env DISABLE_MFSU=true cross-env UMI_DEV_SERVER_COMPRESS=none cross-env HOST=127.0.0.1 cross-env PORT=8889 node --require=./scripts/force-community-loopback.cjs ./node_modules/umi/bin/umi.js dev --public_path=/",
+    "start:community:hot": "cross-env UMI_ENV=community cross-env APP_NAME=chat2db-community cross-env DISABLE_MFSU=true cross-env UMI_DEV_SERVER_COMPRESS=none cross-env HOST=127.0.0.1 cross-env PORT=8889 umi dev --public_path=/",
     "start:offline:hot": "cross-env UMI_ENV=offline cross-env PORT=8888 umi dev",
     "start:proxy:online": "cross-env HMR=none umi dev --webapp=true --public_path=http://localhost:8000/",
     "ui": "yarn add @chat2db/ui",
@@ -179,12 +178,7 @@
     "react": "^16.8.0",
     "react-dom": "^16.8.0"
   },
-  "packageManager": "yarn@1.22.22",
   "engines": {
-    "node": ">=18.17.0 <19 || >=20 <21 || >=22 <23"
-  },
-  "volta": {
-    "node": "22.22.2",
-    "yarn": "1.22.22"
+    "node": ">=18.17.0"
   }
 }
