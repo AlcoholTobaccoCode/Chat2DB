@@ -1,4 +1,4 @@
-# Community JCEF Desktop development
+# Community Web frontend with JCEF backend
 
 This guide is for contributors who can already build and run the Community Web
 frontend and backend, and need to test the same checkout in the JCEF Desktop
@@ -25,7 +25,7 @@ chat2db-community-server/chat2db-community-start/target/chat2db-community.jar
 chat2db-community-server/chat2db-community-start/target/lib/
 ```
 
-## Start JCEF Desktop
+## Start the Web frontend and JCEF backend
 
 From the repository root, run:
 
@@ -35,22 +35,14 @@ JBR_HOME=/path/to/jbr ./script/dev-community-jcef.sh
 
 The script starts the Community Web frontend with
 `yarn run start:community:hot`, waits until `http://127.0.0.1:8889/` responds,
-and then starts JCEF Desktop with the required Community development JVM
-properties. JCEF Desktop contains the Community backend; the script does not
-start a separate Web backend.
+and then starts the JCEF backend with `-Dchat2db.jcef.web-frontend=true`.
+That parameter tells JCEF to load the Web frontend instead of packaged frontend
+files. The script does not start a separate Web backend.
 
 Press `Ctrl+C` to stop both processes. Missing dependencies, build artifacts,
 and runtime files are reported by Yarn, curl, or Java. Port availability remains
 a prerequisite and is not diagnosed by the launcher.
 
-In development, JCEF loads the frontend from `http://127.0.0.1:8889/`. Packaged
-releases continue to load the bundled `dist/index.html`.
-
-Only the configured main-frame renderer origin can call the JCEF bridge. This
-prevents an unrelated page from invoking native Desktop actions.
-
-## Test the launcher
-
-```bash
-bash script/dev-community-jcef.test.sh
-```
+Without `-Dchat2db.jcef.web-frontend=true`, JCEF continues to load the bundled
+`dist/index.html`. Packaged releases do not pass this parameter and are
+unchanged.

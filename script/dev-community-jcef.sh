@@ -74,6 +74,7 @@ done
     -Dchat2db.gui=true \
     -Dchat2db.runtime.mode=community \
     -Dchat2db.mode=DESKTOP \
+    -Dchat2db.jcef.web-frontend=true \
     -Dchat2db.network.status=OFFLINE \
     -Dfile.encoding=UTF-8 \
     "-Dchat2db.community.encryption-key-file=${CHAT2DB_COMMUNITY_ENCRYPTION_KEY_FILE:-${HOME}/.config/chat2db-community/encryption.key}" \

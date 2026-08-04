@@ -22,7 +22,6 @@ public class CorsFilter implements Filter {
             "http://127.0.0.1:8888",
             "http://localhost:8888",
             "http://127.0.0.1:8889",
-            "http://localhost:8889",
             "http://127.0.0.1:10825",
             "http://localhost:10825"
     );

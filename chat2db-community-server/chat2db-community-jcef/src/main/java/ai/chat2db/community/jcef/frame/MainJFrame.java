@@ -5,6 +5,7 @@ import ai.chat2db.community.tools.config.SystemSettingConstant;
 import ai.chat2db.community.jcef.context.JcefContext;
 import ai.chat2db.community.jcef.enums.ActionTypeEnum;
 import ai.chat2db.community.jcef.enums.AppThemeEnum;
+import ai.chat2db.community.jcef.enums.OSTypeEnum;
 import ai.chat2db.community.jcef.enums.ThemeEnum;
 import ai.chat2db.community.jcef.event.manager.FileOpenEventManager;
 import ai.chat2db.community.jcef.handler.biz.IJcefActionHandler;
@@ -14,8 +15,6 @@ import ai.chat2db.community.jcef.handler.mouse.CursorHandler;
 import ai.chat2db.community.jcef.listener.FileManagerService;
 import ai.chat2db.community.jcef.terminal.TerminalSessionManager;
 import ai.chat2db.community.jcef.menus.Chat2DBMenuBar;
-import ai.chat2db.community.jcef.renderer.RendererSource;
-import ai.chat2db.community.jcef.renderer.RendererSourceResolver;
 import ai.chat2db.community.jcef.utils.*;
 import ai.chat2db.community.tools.exception.BusinessException;
 import ai.chat2db.community.tools.console.ConsoleCodec;
@@ -53,7 +52,9 @@ import org.cef.handler.CefAppHandlerAdapter;
 import org.cef.handler.CefDragHandler;
 import org.cef.handler.CefFocusHandler;
 import org.cef.handler.CefFocusHandlerAdapter;
+import org.cef.handler.CefLoadHandlerAdapter;
 import org.cef.handler.CefMessageRouterHandlerAdapter;
+import org.cef.network.CefRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -92,6 +93,8 @@ public class MainJFrame extends JFrame {
     private static final String CHAT2DB_IPC_RESPONSE_SERVICE_STATUS_SUCCESS =
             ConsoleCodec.CHAT2DB_IPC_RESPONSE_SERVICE_STATUS_SUCCESS;
     private static final String MAC_OS_14_1_VERSION_PREFIX = "14.1";
+    private static final String WEB_FRONTEND_PROPERTY = "chat2db.jcef.web-frontend";
+    private static final String WEB_FRONTEND_URL = "http://127.0.0.1:8889/";
     private JSplitPane splitPane;
     private DevToolsPanel devToolsPanel;
     private boolean isDevToolsVisible = false;
@@ -100,7 +103,6 @@ public class MainJFrame extends JFrame {
     private CefBrowser browser_;
     private Component browserUI_;
     private JCefAppConfig jcefAppConfig_;
-    private RendererSource rendererSource;
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private final Map<Pair<String, String>, IJcefActionHandler> actionHandlers = new HashMap<>();
     private static final String appName;
@@ -475,6 +477,20 @@ public class MainJFrame extends JFrame {
                 return false;
             }
         });
+        this.client_.addLoadHandler(new CefLoadHandlerAdapter() {
+            @Override
+            public void onLoadStart(CefBrowser browser, CefFrame frame, CefRequest.TransitionType transitionType) {
+                if (frame.isMain()) {
+                    String languagePreference = OSOperateUtil.getLanguagePreference();
+                    OSTypeEnum osType = JcefContext.getInstance().getOsType();
+                    browser.executeJavaScript(String.format("window.navigator.app_language = '%s';", languagePreference), browser.getURL(), 0);
+                    browser.executeJavaScript(String.format("window.navigator.os_type = '%s';", osType), browser.getURL(), 0);
+                }
+            }
+            @Override
+            public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {
+            }
+        });
         this.client_.addDragHandler(new CefDragHandler() {
             @Override
             public boolean onDragEnter(CefBrowser browser, CefDragData dragData, int mask) {
@@ -625,12 +641,6 @@ public class MainJFrame extends JFrame {
             @Override
             public boolean onQuery(CefBrowser browser, CefFrame frame, long queryId, String data,
                                    boolean persistent, CefQueryCallback callback) {
-                String frameUrl = frame == null ? null : frame.getURL();
-                if (rendererSource == null || frame == null || !rendererSource.trusts(frame.isMain(), frameUrl)) {
-                    log.warn("Rejected JCEF query from untrusted renderer URL: {}", frameUrl);
-                    callback.failure(403, "Untrusted renderer origin");
-                    return true;
-                }
                 executor.submit(() -> {
                     String action = "unKnow Action";
                     ConsoleMessage wsMessage = new ConsoleMessage();
@@ -708,18 +718,26 @@ public class MainJFrame extends JFrame {
     }
     private void initializeBrowserAndUI() {
         log.info("4. Starting CefBrowser and UI component creation...");
-        this.rendererSource = RendererSourceResolver.resolve(
-                Paths.get(OSOperateUtil.getCurrentJarPath()),
-                ConfigUtils.isDesktop() && "dev".equals(ConfigUtils.getEnv()),
-                ConfigUtils.isRelease()
-        );
-        this.client_.addLoadHandler(new RendererLoadHandler(
-                rendererSource,
-                OSOperateUtil::getLanguagePreference,
-                JCEF_CONTEXT.getOsType()
-        ));
-        log.info("Resolved JCEF renderer source: {}", rendererSource.entryUrl());
-        this.browser_ = this.client_.createBrowser(rendererSource.entryUrl(), CefRendering.DEFAULT, false);
+        String indexHtmlFile;
+        if (Boolean.getBoolean(WEB_FRONTEND_PROPERTY)) {
+            indexHtmlFile = WEB_FRONTEND_URL;
+            log.info("Using Community Web frontend for JCEF development: {}", indexHtmlFile);
+        } else {
+            String currentJarPath = OSOperateUtil.getCurrentJarPath();
+            try {
+                Path indexHtmlPath = Paths.get(currentJarPath, "dist", "index.html").toAbsolutePath().normalize();
+                if (!Files.isRegularFile(indexHtmlPath)) {
+                    log.error("JCEF index file not found: {}", indexHtmlPath);
+                    throw new BusinessException("Failed to load frontend files");
+                }
+                indexHtmlFile = indexHtmlPath.toUri().toURL().toString();
+                log.info("Resolved JCEF index file: {}", indexHtmlFile);
+            } catch (MalformedURLException e) {
+                log.error(e.getMessage(), e);
+                throw new BusinessException("Failed to load frontend files");
+            }
+        }
+        this.browser_ = this.client_.createBrowser(indexHtmlFile, CefRendering.DEFAULT, false);
         this.browserUI_ = browser_.getUIComponent();
         this.browserUI_.addMouseListener(new MouseAdapter() {
             @Override

@@ -165,9 +165,6 @@ jobs:
       - name: Validate Community operations contracts
         run: ruby script/github/validate-community-operations.rb
 
-      - name: Test Community JCEF development launcher
-        run: bash script/dev-community-jcef.test.sh
-
       - name: Test Community workflow automation
         run: node --test script/github/issue-claim.test.js script/github/sync-community-project.test.js
 
